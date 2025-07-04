@@ -27,17 +27,15 @@ HTML_FORM = f"""
   <h1 class="text-2xl font-bold mb-4 text-gray-800">Download Your Video</h1>
   <p class="text-gray-600 mb-6">Paste the video URL and click download</p>
   <form method="post" class="space-y-4">
-    <div class="flex space-x-2">
-      <input id="url-input" type="text" name="url" placeholder="https://…" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-      <div class="space-y-2">
-        <input id="url-input" type="text" name="url" placeholder="https://…" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-        
-        <div class="flex space-x-2">
-            <input type="text" name="start" placeholder="Start time (mm:ss)" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="number" name="duration" placeholder="Duration (s)" value="5" min="1" class="w-24 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        </div>
-      <button type="button" onclick="pasteClipboard()" class="px-3 bg-gray-200 rounded-md hover:bg-gray-300">📋</button>
+    <div class="space-y-2">
+      <div class="flex space-x-2">
+        <input id="url-input" type="text" name="url" placeholder="https://…" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="button" onclick="clearField()" class="px-3 bg-gray-200 rounded-md hover:bg-gray-300">🗑️</button>
+      </div>
+      <div class="flex space-x-2">
+        <input type="text" name="start" placeholder="Start (mm:ss)" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="number" name="duration" placeholder="Duration (s)" value="5" min="1" class="w-24 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
     </div>
     <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600">Download</button>
   </form>
@@ -45,15 +43,9 @@ HTML_FORM = f"""
 </div>
 
 <script>
-async function pasteClipboard() {{
+function clearField() {{
     const input = document.getElementById('url-input');
     input.value = '';
-    try {{
-        const text = await navigator.clipboard.readText();
-        input.value = text;
-    }} catch(err) {{
-        alert('Unable to access clipboard: ' + err);
-    }}
 }}
 </script>
 
@@ -77,27 +69,33 @@ async def get_form():
 @app.post("/", response_class=HTMLResponse)
 async def download_video(
     url: str = Form(...),
-    start: str = Form(default=""),  # mm:ss
-    duration: int = Form(default=5) # seconds
+    start: str = Form(default=""),    # mm:ss
+    duration: int = Form(default=5)  # seconds
 ):
+    if not url.strip():
+        msg = '<p class="text-red-500 mt-4">Please enter a valid URL.</p>'
+        return HTML_FORM.replace("<!-- MESSAGE -->", msg)
+
     cleanup_old_files()
 
     video_id = str(uuid.uuid4())
     output_template = str(DOWNLOAD_DIR / f"{video_id}.%(ext)s")
 
-    # download best available
+    # Step 1: download best available
     cmd = [
         "yt-dlp",
         "-f", "bestvideo+bestaudio/best",
         "-o", output_template,
         url
     ]
+
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError:
         msg = '<p class="text-red-500 mt-4">Error downloading video. Check the URL.</p>'
         return HTML_FORM.replace("<!-- MESSAGE -->", msg)
 
+    # Step 2: find downloaded file
     downloaded_file = next(DOWNLOAD_DIR.glob(f"{video_id}.*"), None)
     if not downloaded_file:
         msg = '<p class="text-red-500 mt-4">Downloaded file not found.</p>'
@@ -105,12 +103,12 @@ async def download_video(
 
     mp4_file = downloaded_file.with_suffix(".mp4")
 
-    # build ffmpeg command
+    # Step 3: build ffmpeg command
     ffmpeg_cmd = ["ffmpeg", "-y"]
     if start:
         try:
             m, s = map(int, start.split(":"))
-            start_seconds = m*60 + s
+            start_seconds = m * 60 + s
             ffmpeg_cmd += ["-ss", str(start_seconds)]
         except Exception:
             msg = '<p class="text-red-500 mt-4">Invalid start time format. Use mm:ss</p>'
@@ -127,6 +125,7 @@ async def download_video(
         str(mp4_file)
     ]
 
+    # Step 4: convert & cut
     try:
         subprocess.check_call(ffmpeg_cmd)
         downloaded_file.unlink()
@@ -134,4 +133,5 @@ async def download_video(
         msg = '<p class="text-red-500 mt-4">Error converting/cutting video.</p>'
         return HTML_FORM.replace("<!-- MESSAGE -->", msg)
 
+    # Step 5: return file
     return FileResponse(path=mp4_file, filename=mp4_file.name, media_type="application/octet-stream")
