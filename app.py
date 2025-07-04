@@ -29,6 +29,14 @@ HTML_FORM = f"""
   <form method="post" class="space-y-4">
     <div class="flex space-x-2">
       <input id="url-input" type="text" name="url" placeholder="https://…" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div class="space-y-2">
+        <input id="url-input" type="text" name="url" placeholder="https://…" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        
+        <div class="flex space-x-2">
+            <input type="text" name="start" placeholder="Start time (mm:ss)" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="number" name="duration" placeholder="Duration (s)" value="5" min="1" class="w-24 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        </div>
       <button type="button" onclick="pasteClipboard()" class="px-3 bg-gray-200 rounded-md hover:bg-gray-300">📋</button>
     </div>
     <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600">Download</button>
@@ -67,51 +75,63 @@ async def get_form():
     return HTML_FORM.replace("<!-- MESSAGE -->", "")
 
 @app.post("/", response_class=HTMLResponse)
-async def download_video(url: str = Form(...)):
-    if not url.strip():
-        msg = '<p class="text-red-500 mt-4">Please enter a valid URL.</p>'
-        return HTML_FORM.replace("<!-- MESSAGE -->", msg)
-
+async def download_video(
+    url: str = Form(...),
+    start: str = Form(default=""),  # mm:ss
+    duration: int = Form(default=5) # seconds
+):
     cleanup_old_files()
 
     video_id = str(uuid.uuid4())
     output_template = str(DOWNLOAD_DIR / f"{video_id}.%(ext)s")
 
-    # Step 1: download best available
+    # download best available
     cmd = [
         "yt-dlp",
         "-f", "bestvideo+bestaudio/best",
         "-o", output_template,
         url
     ]
-
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError:
         msg = '<p class="text-red-500 mt-4">Error downloading video. Check the URL.</p>'
         return HTML_FORM.replace("<!-- MESSAGE -->", msg)
 
-    # Step 2: find downloaded file
     downloaded_file = next(DOWNLOAD_DIR.glob(f"{video_id}.*"), None)
     if not downloaded_file:
         msg = '<p class="text-red-500 mt-4">Downloaded file not found.</p>'
         return HTML_FORM.replace("<!-- MESSAGE -->", msg)
 
-    # Step 3: convert to .mp4 if necessary
-    if downloaded_file.suffix != ".mp4":
-        mp4_file = downloaded_file.with_suffix(".mp4")
-        cmd = [
-            "ffmpeg", "-y", "-i", str(downloaded_file),
-            "-c:v", "libx264", "-c:a", "aac",
-            "-strict", "experimental", str(mp4_file)
-        ]
+    mp4_file = downloaded_file.with_suffix(".mp4")
+
+    # build ffmpeg command
+    ffmpeg_cmd = ["ffmpeg", "-y"]
+    if start:
         try:
-            subprocess.check_call(cmd)
-            downloaded_file.unlink()  # remove original
-            downloaded_file = mp4_file
-        except subprocess.CalledProcessError:
-            msg = '<p class="text-red-500 mt-4">Error converting video to MP4.</p>'
+            m, s = map(int, start.split(":"))
+            start_seconds = m*60 + s
+            ffmpeg_cmd += ["-ss", str(start_seconds)]
+        except Exception:
+            msg = '<p class="text-red-500 mt-4">Invalid start time format. Use mm:ss</p>'
             return HTML_FORM.replace("<!-- MESSAGE -->", msg)
 
-    # Step 4: return file
-    return FileResponse(path=downloaded_file, filename=downloaded_file.name, media_type="application/octet-stream")
+    ffmpeg_cmd += ["-i", str(downloaded_file)]
+    if duration > 0:
+        ffmpeg_cmd += ["-t", str(duration)]
+
+    ffmpeg_cmd += [
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-strict", "experimental",
+        str(mp4_file)
+    ]
+
+    try:
+        subprocess.check_call(ffmpeg_cmd)
+        downloaded_file.unlink()
+    except subprocess.CalledProcessError:
+        msg = '<p class="text-red-500 mt-4">Error converting/cutting video.</p>'
+        return HTML_FORM.replace("<!-- MESSAGE -->", msg)
+
+    return FileResponse(path=mp4_file, filename=mp4_file.name, media_type="application/octet-stream")
