@@ -81,7 +81,7 @@ async def download_video(url: str = Form(...)):
 
     cmd = [
         "yt-dlp",
-        "-f", "bestvideo+bestaudio/best",
+        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
         "-o", output_template,
         url
     ]
@@ -89,7 +89,7 @@ async def download_video(url: str = Form(...)):
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError:
-        msg = '<p class="text-red-500 mt-4">Error al descargar el video. Verifica la URL.</p>'
+        msg = '<p class="text-red-500 mt-4">Error downloading video. Please check the URL or try another video.</p>'
         return HTML_FORM.replace("<!-- MESSAGE -->", msg)
 
 
