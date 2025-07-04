@@ -22,7 +22,7 @@ HTML_FORM = f"""
 <title>Video Downloader</title>
 {TAILWIND_CDN}
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+<body class="bg-gray-50 flex justify-center pt-10 min-h-screen">
 <div class="bg-white p-8 rounded-xl shadow-md w-full max-w-md text-center">
   <h1 class="text-2xl font-bold mb-4 text-gray-800">Download Your Video</h1>
   <p class="text-gray-600 mb-6">Paste the video URL and click download</p>
