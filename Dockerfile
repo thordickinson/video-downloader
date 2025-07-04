@@ -13,14 +13,12 @@ RUN apt-get update && \
 
 # Crea directorio de trabajo
 WORKDIR /app
-
 # Copia el código
-COPY app.py .
 COPY requirements.txt .
-
 # Instala dependencias de Python
 RUN pip install -r requirements.txt
 
+COPY app.py .
 # Expone el puerto
 EXPOSE ${PORT}
 
