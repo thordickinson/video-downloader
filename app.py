@@ -22,22 +22,22 @@ HTML_FORM = f"""
 <title>Video Downloader</title>
 {TAILWIND_CDN}
 </head>
-<body class="bg-gray-50 flex justify-center pt-10 min-h-screen">
+<body class="bg-gray-50 flex justify-center pt-10">
 <div class="bg-white p-8 rounded-xl shadow-md w-full max-w-md text-center">
   <h1 class="text-2xl font-bold mb-4 text-gray-800">Download Your Video</h1>
   <p class="text-gray-600 mb-6">Paste the video URL and click download</p>
   <form method="post" class="space-y-4">
     <div class="space-y-2">
       <div class="flex space-x-2">
-        <input id="url-input" type="text" name="url" placeholder="https://…" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input id="url-input" type="text" name="url" placeholder="https://…" class="min-w-3 flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
         <button type="button" onclick="clearField()" class="px-3 bg-gray-200 rounded-md hover:bg-gray-300">🗑️</button>
       </div>
       <div class="flex items-center space-x-2">
         <input type="checkbox" name="cut" id="cut">
         <label for="cut" class="text-sm text-gray-700">Cut video</label>
       </div>
-      <div class="flex space-x-2">
-        <input type="text" name="start" placeholder="Start (mm:ss)" class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div class="flex flex-row space-x-2">
+        <input type="text" name="start" placeholder="Start (mm:ss)" class="min-w-3 flex-1 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
         <input type="number" name="duration" placeholder="Duration (s)" min="1" class="w-24 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
     </div>
